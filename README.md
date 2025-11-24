@@ -21,7 +21,7 @@ The action implements a three-step process to safely revoke all user sessions:
 
 ### Required Secrets
 
-- `SALESFORCE_ACCESS_TOKEN`: OAuth access token for Salesforce API authentication
+- `BEARER_AUTH_TOKEN`: OAuth access token for Salesforce API authentication
 
 ### Required Environment Variables
 
@@ -149,7 +149,7 @@ Salesforce API calls are subject to rate limits. The action implements:
 - Check that the access token has permission to query User records
 
 **Authentication errors**
-- Verify `SALESFORCE_ACCESS_TOKEN` is valid and not expired
+- Verify `BEARER_AUTH_TOKEN` is valid and not expired
 - Ensure the token has appropriate permissions
 - Check `SALESFORCE_INSTANCE_URL` is correct
 

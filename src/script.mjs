@@ -38,6 +38,7 @@ export default {
    * @param {string} params.username - Salesforce username
    * @param {string} [params.apiVersion="v61.0"] - API version to use
    * @param {Object} context - Execution context with env, secrets, outputs
+   * @param {string} context.secrets.BEARER_AUTH_TOKEN - Bearer token for Salesforce API authentication
    * @returns {Object} Job results
    */
   invoke: async (params, context) => {
@@ -49,11 +50,11 @@ export default {
     }
 
     const { username, apiVersion = 'v61.0' } = params;
-    const { SALESFORCE_ACCESS_TOKEN } = context.secrets;
+    const accessToken = context.secrets.BEARER_AUTH_TOKEN;
     const { SALESFORCE_INSTANCE_URL } = context.environment;
 
-    if (!SALESFORCE_ACCESS_TOKEN) {
-      throw new Error('SALESFORCE_ACCESS_TOKEN secret is required');
+    if (!accessToken) {
+      throw new Error('BEARER_AUTH_TOKEN secret is required');
     }
 
     if (!SALESFORCE_INSTANCE_URL) {
@@ -69,7 +70,7 @@ export default {
       const userQueryEndpoint = `/services/data/${apiVersion}/query?q=SELECT+Id+FROM+User+WHERE+username+LIKE+'${encodedUsername}'+ORDER+BY+Id+ASC`;
 
       console.log('Step 1: Querying for user ID...');
-      const userResponse = await callSalesforceAPI(userQueryEndpoint, 'GET', SALESFORCE_INSTANCE_URL, SALESFORCE_ACCESS_TOKEN);
+      const userResponse = await callSalesforceAPI(userQueryEndpoint, 'GET', SALESFORCE_INSTANCE_URL, accessToken);
 
       if (!userResponse.ok) {
         throw new Error(`Failed to query user: ${userResponse.status} ${userResponse.statusText}`);
@@ -88,7 +89,7 @@ export default {
       const sessionQueryEndpoint = `/services/data/${apiVersion}/query?q=SELECT+Id,UsersId+FROM+AuthSession+WHERE+UsersId='${userId}'+AND+IsCurrent=false+ORDER+BY+Id+ASC`;
 
       console.log('Step 2: Querying for user sessions...');
-      const sessionResponse = await callSalesforceAPI(sessionQueryEndpoint, 'GET', SALESFORCE_INSTANCE_URL, SALESFORCE_ACCESS_TOKEN);
+      const sessionResponse = await callSalesforceAPI(sessionQueryEndpoint, 'GET', SALESFORCE_INSTANCE_URL, accessToken);
 
       if (!sessionResponse.ok) {
         throw new Error(`Failed to query sessions: ${sessionResponse.status} ${sessionResponse.statusText}`);
@@ -118,7 +119,7 @@ export default {
         const deleteEndpoint = `/services/data/${apiVersion}/sobjects/AuthSession/${session.Id}`;
 
         try {
-          const deleteResponse = await callSalesforceAPI(deleteEndpoint, 'DELETE', SALESFORCE_INSTANCE_URL, SALESFORCE_ACCESS_TOKEN);
+          const deleteResponse = await callSalesforceAPI(deleteEndpoint, 'DELETE', SALESFORCE_INSTANCE_URL, accessToken);
 
           // Handle 204 No Content as success, and 404 as success (cascade deletes)
           if (deleteResponse.status === 204 || deleteResponse.status === 404) {
@@ -179,7 +180,7 @@ export default {
         error.message.includes('403') ||
         error.message.includes('User not found') ||
         error.message.includes('username is required') ||
-        error.message.includes('SALESFORCE_ACCESS_TOKEN') ||
+        error.message.includes('BEARER_AUTH_TOKEN') ||
         error.message.includes('SALESFORCE_INSTANCE_URL')) {
       throw error;
     }

@@ -10,7 +10,7 @@ describe('Salesforce Revoke Session Script', () => {
       SALESFORCE_INSTANCE_URL: 'https://mycompany.salesforce.com'
     },
     secrets: {
-      SALESFORCE_ACCESS_TOKEN: 'test-access-token-123456'
+      BEARER_AUTH_TOKEN: 'test-access-token-123456'
     }
   };
 
@@ -245,7 +245,7 @@ describe('Salesforce Revoke Session Script', () => {
       };
 
       await expect(script.invoke(params, contextMissingSecret))
-        .rejects.toThrow('SALESFORCE_ACCESS_TOKEN secret is required');
+        .rejects.toThrow('BEARER_AUTH_TOKEN secret is required');
     });
 
     test('should validate required environment variables', async () => {
