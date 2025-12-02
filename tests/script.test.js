@@ -7,7 +7,7 @@ global.fetch = jest.fn();
 describe('Salesforce Revoke Session Script', () => {
   const mockContext = {
     environment: {
-      SALESFORCE_INSTANCE_URL: 'https://mycompany.salesforce.com'
+      ADDRESS: 'https://mycompany.salesforce.com'
     },
     secrets: {
       BEARER_AUTH_TOKEN: 'test-access-token-123456'
@@ -24,8 +24,7 @@ describe('Salesforce Revoke Session Script', () => {
   describe('invoke handler', () => {
     test('should successfully revoke sessions with three-step process', async () => {
       const params = {
-        username: 'test.user@example.com',
-        apiVersion: 'v61.0'
+        username: 'test.user@example.com'
       };
 
       // Step 1: User query response
@@ -70,7 +69,7 @@ describe('Salesforce Revoke Session Script', () => {
 
       // Step 1: User query
       expect(fetch).toHaveBeenNthCalledWith(1,
-        'https://mycompany.salesforce.com/services/data/v61.0/query?q=SELECT+Id+FROM+User+WHERE+username+LIKE+%27test.user%40example.com%27+ORDER+BY+Id+ASC',
+        "https://mycompany.salesforce.com/services/data/v61.0/query?q=SELECT+Id+FROM+User+WHERE+username+LIKE+'test.user%40example.com'+ORDER+BY+Id+ASC",
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
@@ -81,7 +80,7 @@ describe('Salesforce Revoke Session Script', () => {
 
       // Step 2: Session query
       expect(fetch).toHaveBeenNthCalledWith(2,
-        'https://mycompany.salesforce.com/services/data/v61.0/query?q=SELECT+Id,UsersId+FROM+AuthSession+WHERE+UsersId=%27user123%27+AND+IsCurrent=false+ORDER+BY+Id+ASC',
+        "https://mycompany.salesforce.com/services/data/v61.0/query?q=SELECT+Id,UsersId+FROM+AuthSession+WHERE+UsersId='user123'+AND+IsCurrent=false+ORDER+BY+Id+ASC",
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
@@ -99,34 +98,6 @@ describe('Salesforce Revoke Session Script', () => {
             'Authorization': 'Bearer test-access-token-123456'
           })
         })
-      );
-    });
-
-    test('should handle default API version', async () => {
-      const params = {
-        username: 'test.user@example.com'
-      };
-
-      // Mock responses for default v61.0
-      fetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ records: [{ Id: 'user123' }] })
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ records: [] })
-        });
-
-      const result = await script.invoke(params, mockContext);
-
-      expect(result.status).toBe('success');
-      expect(result.sessionsRevoked).toBe(0);
-
-      // Verify default API version is used
-      expect(fetch).toHaveBeenNthCalledWith(1,
-        expect.stringContaining('/services/data/v61.0/query'),
-        expect.any(Object)
       );
     });
 
@@ -245,7 +216,7 @@ describe('Salesforce Revoke Session Script', () => {
       };
 
       await expect(script.invoke(params, contextMissingSecret))
-        .rejects.toThrow('BEARER_AUTH_TOKEN secret is required');
+        .rejects.toThrow('No authentication configured');
     });
 
     test('should validate required environment variables', async () => {
@@ -256,7 +227,7 @@ describe('Salesforce Revoke Session Script', () => {
       };
 
       await expect(script.invoke(params, contextMissingEnv))
-        .rejects.toThrow('SALESFORCE_INSTANCE_URL environment variable is required');
+        .rejects.toThrow('No URL specified. Provide address parameter or ADDRESS environment variable');
     });
 
     test('should handle user not found error', async () => {
@@ -310,105 +281,15 @@ describe('Salesforce Revoke Session Script', () => {
   });
 
   describe('error handler', () => {
-    // Mock setTimeout to avoid actual delays
-    beforeEach(() => {
-      jest.spyOn(global, 'setTimeout').mockImplementation((callback) => {
-        callback();
-        return 123; // Mock timer ID
-      });
-    });
-
-    afterEach(() => {
-      if (global.setTimeout.mockRestore) {
-        global.setTimeout.mockRestore();
-      }
-    });
-
-    test('should retry on rate limit errors (429)', async () => {
+    test('should rethrow errors', async () => {
+      const testError = new Error('Some error occurred');
       const params = {
         username: 'test@example.com',
-        error: { message: 'Rate limited: 429' }
+        error: testError
       };
 
-      const result = await script.error(params, mockContext);
-
-      expect(result.status).toBe('retry_requested');
-    });
-
-    test('should retry on server errors (502, 503, 504)', async () => {
-      const params = {
-        username: 'test@example.com',
-        error: { message: 'Server error: 503 Service Unavailable' }
-      };
-
-      const result = await script.error(params, mockContext);
-
-      expect(result.status).toBe('retry_requested');
-    });
-
-    test('should not retry on authentication errors (401, 403)', async () => {
-      const params = {
-        username: 'test@example.com',
-        error: { message: 'Authentication failed: 401' }
-      };
-
-      try {
-        await script.error(params, mockContext);
-        throw new Error('Expected error to be thrown');
-      } catch (error) {
-        expect(error.message).toBe('Authentication failed: 401');
-      }
-    });
-
-    test('should not retry on validation errors', async () => {
-      const params = {
-        username: 'test@example.com',
-        error: { message: 'username is required' }
-      };
-
-      try {
-        await script.error(params, mockContext);
-        throw new Error('Expected error to be thrown');
-      } catch (error) {
-        expect(error.message).toBe('username is required');
-      }
-    });
-
-    test('should not retry on user not found errors', async () => {
-      const params = {
-        username: 'test@example.com',
-        error: { message: 'User not found: test@example.com' }
-      };
-
-      try {
-        await script.error(params, mockContext);
-        throw new Error('Expected error to be thrown');
-      } catch (error) {
-        expect(error.message).toBe('User not found: test@example.com');
-      }
-    });
-
-    test('should request retry for unknown errors', async () => {
-      const params = {
-        username: 'test@example.com',
-        error: { message: 'Unknown network error' }
-      };
-
-      const result = await script.error(params, mockContext);
-
-      expect(result.status).toBe('retry_requested');
-    });
-
-    test('should wait before requesting retry for rate limits', async () => {
-      const params = {
-        username: 'test@example.com',
-        error: { message: 'Rate limited: 429' }
-      };
-
-      const result = await script.error(params, mockContext);
-
-      expect(result.status).toBe('retry_requested');
-      expect(global.setTimeout).toHaveBeenCalled();
+      await expect(script.error(params, mockContext))
+        .rejects.toThrow('Some error occurred');
     });
   });
 

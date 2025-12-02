@@ -8,21 +8,23 @@
  * 3. Delete each session individually
  */
 
+import { getBaseUrl, getAuthorizationHeader } from '@sgnl-actions/utils';
+
 /**
  * Helper function to make Salesforce API calls
  * @param {string} endpoint - API endpoint path
  * @param {string} method - HTTP method
- * @param {string} instanceUrl - Salesforce instance URL
- * @param {string} accessToken - OAuth access token
+ * @param {string} baseUrl - Salesforce instance URL
+ * @param {string} authHeader - Authorization header (already formatted)
  * @returns {Response} Fetch response
  */
-async function callSalesforceAPI(endpoint, method, instanceUrl, accessToken) {
-  const url = new URL(endpoint, instanceUrl);
+async function callSalesforceAPI(endpoint, method, baseUrl, authHeader) {
+  const url = `${baseUrl}${endpoint}`;
 
-  const response = await fetch(url.toString(), {
+  const response = await fetch(url, {
     method,
     headers: {
-      'Authorization': `Bearer ${accessToken}`,
+      'Authorization': authHeader,
       'Accept': 'application/json',
       'Content-Type': 'application/json'
     }
@@ -36,10 +38,27 @@ export default {
    * Main execution handler - revokes all sessions for a user
    * @param {Object} params - Job input parameters
    * @param {string} params.username - Salesforce username
-   * @param {string} [params.apiVersion="v61.0"] - API version to use
-   * @param {Object} context - Execution context with env, secrets, outputs
-   * @param {string} context.secrets.BEARER_AUTH_TOKEN - Bearer token for Salesforce API authentication
-   * @returns {Object} Job results
+   * @param {string} params.delay - Optional delay before revoking sessions
+   * @param {string} params.address - Optional Salesforce API base URL
+   * @param {Object} context - Execution context with secrets and environment
+   * @param {string} context.environment.ADDRESS - Default Salesforce API base URL
+   *
+   * The configured auth type will determine which of the following environment variables and secrets are available
+   * @param {string} context.secrets.BEARER_AUTH_TOKEN
+   *
+   * @param {string} context.secrets.BASIC_USERNAME
+   * @param {string} context.secrets.BASIC_PASSWORD
+   *
+   * @param {string} context.secrets.OAUTH2_CLIENT_CREDENTIALS_CLIENT_SECRET
+   * @param {string} context.environment.OAUTH2_CLIENT_CREDENTIALS_AUDIENCE
+   * @param {string} context.environment.OAUTH2_CLIENT_CREDENTIALS_AUTH_STYLE
+   * @param {string} context.environment.OAUTH2_CLIENT_CREDENTIALS_CLIENT_ID
+   * @param {string} context.environment.OAUTH2_CLIENT_CREDENTIALS_SCOPE
+   * @param {string} context.environment.OAUTH2_CLIENT_CREDENTIALS_TOKEN_URL
+   *
+   * @param {string} context.secrets.OAUTH2_AUTHORIZATION_CODE_ACCESS_TOKEN
+   *
+   * @returns {Promise<Object>} Action result
    */
   invoke: async (params, context) => {
     console.log('Starting Salesforce session revocation');
@@ -49,28 +68,23 @@ export default {
       throw new Error('username is required');
     }
 
-    const { username, apiVersion = 'v61.0' } = params;
-    const accessToken = context.secrets.BEARER_AUTH_TOKEN;
-    const { SALESFORCE_INSTANCE_URL } = context.environment;
+    const { username } = params;
 
-    if (!accessToken) {
-      throw new Error('BEARER_AUTH_TOKEN secret is required');
-    }
+    // Get base URL using utility function
+    const baseUrl = getBaseUrl(params, context);
 
-    if (!SALESFORCE_INSTANCE_URL) {
-      throw new Error('SALESFORCE_INSTANCE_URL environment variable is required');
-    }
+    // Get authorization header using utility function
+    const authHeader = await getAuthorizationHeader(context);
 
     console.log(`Processing username: ${username}`);
-    console.log(`Using API version: ${apiVersion}`);
 
     try {
       // Step 1: Query for user ID by username
       const encodedUsername = encodeURIComponent(username);
-      const userQueryEndpoint = `/services/data/${apiVersion}/query?q=SELECT+Id+FROM+User+WHERE+username+LIKE+'${encodedUsername}'+ORDER+BY+Id+ASC`;
+      const userQueryEndpoint = `/services/data/v61.0/query?q=SELECT+Id+FROM+User+WHERE+username+LIKE+'${encodedUsername}'+ORDER+BY+Id+ASC`;
 
       console.log('Step 1: Querying for user ID...');
-      const userResponse = await callSalesforceAPI(userQueryEndpoint, 'GET', SALESFORCE_INSTANCE_URL, accessToken);
+      const userResponse = await callSalesforceAPI(userQueryEndpoint, 'GET', baseUrl, authHeader);
 
       if (!userResponse.ok) {
         throw new Error(`Failed to query user: ${userResponse.status} ${userResponse.statusText}`);
@@ -86,10 +100,10 @@ export default {
       console.log(`Found user ID: ${userId}`);
 
       // Step 2: Query for all user's auth sessions
-      const sessionQueryEndpoint = `/services/data/${apiVersion}/query?q=SELECT+Id,UsersId+FROM+AuthSession+WHERE+UsersId='${userId}'+AND+IsCurrent=false+ORDER+BY+Id+ASC`;
+      const sessionQueryEndpoint = `/services/data/v61.0/query?q=SELECT+Id,UsersId+FROM+AuthSession+WHERE+UsersId='${userId}'+AND+IsCurrent=false+ORDER+BY+Id+ASC`;
 
       console.log('Step 2: Querying for user sessions...');
-      const sessionResponse = await callSalesforceAPI(sessionQueryEndpoint, 'GET', SALESFORCE_INSTANCE_URL, accessToken);
+      const sessionResponse = await callSalesforceAPI(sessionQueryEndpoint, 'GET', baseUrl, authHeader);
 
       if (!sessionResponse.ok) {
         throw new Error(`Failed to query sessions: ${sessionResponse.status} ${sessionResponse.statusText}`);
@@ -116,10 +130,10 @@ export default {
       let sessionsRevoked = 0;
 
       for (const session of sessions) {
-        const deleteEndpoint = `/services/data/${apiVersion}/sobjects/AuthSession/${session.Id}`;
+        const deleteEndpoint = `/services/data/v61.0/sobjects/AuthSession/${session.Id}`;
 
         try {
-          const deleteResponse = await callSalesforceAPI(deleteEndpoint, 'DELETE', SALESFORCE_INSTANCE_URL, accessToken);
+          const deleteResponse = await callSalesforceAPI(deleteEndpoint, 'DELETE', baseUrl, authHeader);
 
           // Handle 204 No Content as success, and 404 as success (cascade deletes)
           if (deleteResponse.status === 204 || deleteResponse.status === 404) {
@@ -153,40 +167,14 @@ export default {
   },
 
   /**
-   * Error recovery handler - implements retry logic for transient failures
+   * Error recovery handler - re-throws errors to let framework handle retry logic
    * @param {Object} params - Original params plus error information
    * @param {Object} context - Execution context
    * @returns {Object} Recovery results or throws for fatal errors
    */
   error: async (params, _context) => {
-    const { error, username } = params;
-    console.error(`Session revocation encountered error for user ${username}: ${error.message}`);
-
-    // Check for retryable errors (rate limits, server errors)
-    if (error.message.includes('429') ||
-        error.message.includes('502') ||
-        error.message.includes('503') ||
-        error.message.includes('504')) {
-
-      console.log('Detected retryable error, waiting before retry...');
-      await new Promise(resolve => setTimeout(resolve, 5000));
-
-      // Let the system handle the retry instead
-      return { status: 'retry_requested' };
-    }
-
-    // Fatal errors - don't retry
-    if (error.message.includes('401') ||
-        error.message.includes('403') ||
-        error.message.includes('User not found') ||
-        error.message.includes('username is required') ||
-        error.message.includes('BEARER_AUTH_TOKEN') ||
-        error.message.includes('SALESFORCE_INSTANCE_URL')) {
-      throw error;
-    }
-
-    // Default: let framework retry
-    return { status: 'retry_requested' };
+    const { error } = params;
+    throw error;
   },
 
   /**
