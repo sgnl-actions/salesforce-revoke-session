@@ -12,25 +12,46 @@ The action implements a three-step process to safely revoke all user sessions:
 
 ## Prerequisites
 
-- Salesforce access token with appropriate permissions:
+- Valid authentication with appropriate permissions:
   - View All Users (`ViewAllUsers`)
   - Manage Auth Providers (`ManageAuthProviders`) or Admin permissions
 - Salesforce instance URL
 
 ## Configuration
 
-### Required Secrets
+### Authentication
 
-- `SALESFORCE_ACCESS_TOKEN`: OAuth access token for Salesforce API authentication
+This action supports multiple authentication methods. Configure one of the following:
+
+#### Bearer Token
+- **`BEARER_AUTH_TOKEN`** (secret) - A valid Salesforce OAuth access token
+
+#### Basic Authentication
+- **`BASIC_USERNAME`** (secret) - Username for basic auth
+- **`BASIC_PASSWORD`** (secret) - Password for basic auth
+
+#### OAuth2 Client Credentials
+- **`OAUTH2_CLIENT_CREDENTIALS_CLIENT_ID`** (environment) - OAuth2 client ID
+- **`OAUTH2_CLIENT_CREDENTIALS_CLIENT_SECRET`** (secret) - OAuth2 client secret
+- **`OAUTH2_CLIENT_CREDENTIALS_TOKEN_URL`** (environment) - Token endpoint URL
+- **`OAUTH2_CLIENT_CREDENTIALS_SCOPE`** (environment) - OAuth2 scope (optional)
+- **`OAUTH2_CLIENT_CREDENTIALS_AUDIENCE`** (environment) - OAuth2 audience (optional)
+- **`OAUTH2_CLIENT_CREDENTIALS_AUTH_STYLE`** (environment) - Auth style: `in_header` or `in_body`
+
+#### OAuth2 Authorization Code
+- **`OAUTH2_AUTHORIZATION_CODE_ACCESS_TOKEN`** (secret) - OAuth2 access token
 
 ### Required Environment Variables
 
-- `SALESFORCE_INSTANCE_URL`: Salesforce instance URL (e.g., `https://mycompany.salesforce.com`)
+- **`ADDRESS`** - Salesforce instance URL (e.g., `https://mycompany.salesforce.com`)
 
 ### Input Parameters
 
-- `username` (string, required): Salesforce username to revoke sessions for
-- `apiVersion` (string, optional): Salesforce API version to use (defaults to `"v61.0"`)
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `username` | string | Yes | Salesforce username to revoke sessions for |
+| `delay` | Duration | No | Optional delay before revoking sessions |
+| `address` | string | No | Salesforce instance URL (overrides `ADDRESS` environment variable) |
 
 ### Output
 
@@ -44,21 +65,21 @@ The action implements a three-step process to safely revoke all user sessions:
 
 ### Step 1: User Lookup
 ```
-GET /services/data/{apiVersion}/query?q=SELECT+Id+FROM+User+WHERE+username+LIKE+'{encodedUsername}'+ORDER+BY+Id+ASC
+GET /services/data/v61.0/query?q=SELECT+Id+FROM+User+WHERE+username+LIKE+'{encodedUsername}'+ORDER+BY+Id+ASC
 ```
 
 Queries the User object to find the user ID for the given username. The username is URL-encoded to handle special characters safely.
 
 ### Step 2: Session Query
 ```
-GET /services/data/{apiVersion}/query?q=SELECT+Id,UsersId+FROM+AuthSession+WHERE+UsersId='{userId}'+AND+IsCurrent=false+ORDER+BY+Id+ASC
+GET /services/data/v61.0/query?q=SELECT+Id,UsersId+FROM+AuthSession+WHERE+UsersId='{userId}'+AND+IsCurrent=false+ORDER+BY+Id+ASC
 ```
 
 Finds all AuthSession records for the user where `IsCurrent=false`, representing sessions that can be deleted.
 
 ### Step 3: Session Deletion
 ```
-DELETE /services/data/{apiVersion}/sobjects/AuthSession/{sessionId}
+DELETE /services/data/v61.0/sobjects/AuthSession/{sessionId}
 ```
 
 Deletes each session individually. Handles both `204 No Content` (successful deletion) and `404 Not Found` (already deleted due to cascade) as success cases.
@@ -67,15 +88,14 @@ Deletes each session individually. Handles both `204 No Content` (successful del
 
 The action implements comprehensive error handling:
 
-### Retryable Errors (with backoff)
-- Rate limiting (429)
-- Server errors (502, 503, 504)
+### Error Behavior
+All errors are re-thrown to allow the SGNL framework to handle retry logic based on the configured retry policy.
 
-### Fatal Errors (no retry)
-- Authentication failures (401, 403)
-- Invalid input (missing username)
-- Configuration errors (missing secrets/environment)
-- User not found
+### Common Errors
+- **Authentication failures** (401, 403): Invalid or expired credentials
+- **Invalid input**: Missing username parameter
+- **Configuration errors**: Missing required environment variables or secrets
+- **User not found**: Specified username doesn't exist in Salesforce
 
 ### Partial Failures
 If some sessions fail to delete, the action logs warnings but continues processing remaining sessions and returns the count of successfully revoked sessions.
@@ -89,19 +109,11 @@ If some sessions fail to delete, the action logs warnings but continues processi
 }
 ```
 
-### With Custom API Version
-```json
-{
-  "username": "admin@company.com",
-  "apiVersion": "v60.0"
-}
-```
-
 ## Security Considerations
 
 - **URL Encoding**: Usernames are properly URL-encoded to prevent SOQL injection
-- **Bearer Authentication**: Uses standard OAuth Bearer token authentication
-- **No Credential Logging**: Access tokens are never logged in full
+- **Secure Authentication**: Credentials are handled securely through the authentication framework
+- **No Credential Logging**: Credentials are never logged in full
 - **Least Privilege**: Only queries necessary fields and objects
 
 ## Development
@@ -130,13 +142,13 @@ The action includes comprehensive tests covering:
 - 404 handling as success (cascade deletes)
 - Partial failure scenarios
 - Input validation
-- Error handling and retry logic
+- Error handler behavior
 - No sessions found case
 
 ## API Rate Limits
 
-Salesforce API calls are subject to rate limits. The action implements:
-- Exponential backoff for 429 rate limit responses
+Salesforce API calls are subject to rate limits. The SGNL framework handles:
+- Retry logic for 429 rate limit responses based on configured retry policy
 - Graceful handling of server errors
 - Individual session deletion to minimize API call overhead
 
@@ -146,12 +158,17 @@ Salesforce API calls are subject to rate limits. The action implements:
 
 **User not found**
 - Verify the username exists in Salesforce
-- Check that the access token has permission to query User records
+- Check that your credentials have permission to query User records
 
 **Authentication errors**
-- Verify `SALESFORCE_ACCESS_TOKEN` is valid and not expired
-- Ensure the token has appropriate permissions
-- Check `SALESFORCE_INSTANCE_URL` is correct
+- Verify your credentials are valid and not expired
+- Ensure you have appropriate permissions
+- Check that `ADDRESS` environment variable is correct
+- Ensure you have configured one of the supported authentication methods
+
+**No authentication configured**
+- Verify you have configured one of the supported authentication methods
+- Check that credentials are properly set in secrets and environment variables
 
 **No sessions to revoke**
 - This is normal - user may not have any active sessions
@@ -172,9 +189,9 @@ Enable detailed logging by checking console output:
 
 ## Salesforce Permissions
 
-The access token must have permissions for:
+Your credentials must have permissions for:
 - Querying User records
-- Querying AuthSession records  
+- Querying AuthSession records
 - Deleting AuthSession records
 
 This typically requires:
