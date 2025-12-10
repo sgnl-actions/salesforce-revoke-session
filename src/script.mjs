@@ -8,7 +8,7 @@
  * 3. Delete each session individually
  */
 
-import { getBaseUrl, getAuthorizationHeader } from '@sgnl-actions/utils';
+import { getBaseURL, getAuthorizationHeader,resolveJSONPathTemplates} from '@sgnl-actions/utils';
 
 /**
  * Helper function to make Salesforce API calls
@@ -63,15 +63,24 @@ export default {
   invoke: async (params, context) => {
     console.log('Starting Salesforce session revocation');
 
+    const jobContext = context.data || {};
+
+    // Resolve JSONPath templates in params
+    const { result: resolvedParams, errors } = resolveJSONPathTemplates(params, jobContext);
+    if (errors.length > 0) {
+      throw new Error(`Failed to resolve template values: ${errors.join(', ')}`);
+    }
+
+
     // Validate inputs
-    if (!params.username) {
+    if (!resolvedParams.username) {
       throw new Error('username is required');
     }
 
-    const { username } = params;
+    const { username } = resolvedParams;
 
     // Get base URL using utility function
-    const baseUrl = getBaseUrl(params, context);
+    const baseUrl = getBaseURL(resolvedParams, context);
 
     // Get authorization header using utility function
     const authHeader = await getAuthorizationHeader(context);
