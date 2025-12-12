@@ -23,27 +23,37 @@ The action implements a three-step process to safely revoke all user sessions:
 
 This action supports multiple authentication methods. Configure one of the following:
 
-#### Bearer Token
-- **`BEARER_AUTH_TOKEN`** (secret) - A valid Salesforce OAuth access token
+#### Option 1: Bearer Token
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `BEARER_AUTH_TOKEN` | Secret | Yes | A valid Salesforce OAuth access token |
 
-#### Basic Authentication
-- **`BASIC_USERNAME`** (secret) - Username for basic auth
-- **`BASIC_PASSWORD`** (secret) - Password for basic auth
+#### Option 2: Basic Authentication
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `BASIC_USERNAME` | Secret | Yes | Username for basic auth |
+| `BASIC_PASSWORD` | Secret | Yes | Password for basic auth |
 
-#### OAuth2 Client Credentials
-- **`OAUTH2_CLIENT_CREDENTIALS_CLIENT_ID`** (environment) - OAuth2 client ID
-- **`OAUTH2_CLIENT_CREDENTIALS_CLIENT_SECRET`** (secret) - OAuth2 client secret
-- **`OAUTH2_CLIENT_CREDENTIALS_TOKEN_URL`** (environment) - Token endpoint URL
-- **`OAUTH2_CLIENT_CREDENTIALS_SCOPE`** (environment) - OAuth2 scope (optional)
-- **`OAUTH2_CLIENT_CREDENTIALS_AUDIENCE`** (environment) - OAuth2 audience (optional)
-- **`OAUTH2_CLIENT_CREDENTIALS_AUTH_STYLE`** (environment) - Auth style: `in_header` or `in_body`
+#### Option 3: OAuth2 Client Credentials
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `OAUTH2_CLIENT_CREDENTIALS_CLIENT_SECRET` | Secret | Yes | OAuth2 client secret |
+| `OAUTH2_CLIENT_CREDENTIALS_CLIENT_ID` | Environment | Yes | OAuth2 client ID |
+| `OAUTH2_CLIENT_CREDENTIALS_TOKEN_URL` | Environment | Yes | Token endpoint URL |
+| `OAUTH2_CLIENT_CREDENTIALS_SCOPE` | Environment | No | OAuth2 scope |
+| `OAUTH2_CLIENT_CREDENTIALS_AUDIENCE` | Environment | No | OAuth2 audience |
+| `OAUTH2_CLIENT_CREDENTIALS_AUTH_STYLE` | Environment | No | Auth style: `in_header` or `in_body` |
 
-#### OAuth2 Authorization Code
-- **`OAUTH2_AUTHORIZATION_CODE_ACCESS_TOKEN`** (secret) - OAuth2 access token
+#### Option 4: OAuth2 Authorization Code
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `OAUTH2_AUTHORIZATION_CODE_ACCESS_TOKEN` | Secret | Yes | OAuth2 access token |
 
-### Required Environment Variables
+### Environment Variables
 
-- **`ADDRESS`** - Salesforce instance URL (e.g., `https://mycompany.salesforce.com`)
+| Variable | Required | Description | Example |
+|----------|----------|-------------|---------|
+| `ADDRESS` | Yes | Default Salesforce API base URL | `https://mycompany.salesforce.com` |
 
 ### Input Parameters
 
@@ -53,13 +63,16 @@ This action supports multiple authentication methods. Configure one of the follo
 | `delay` | Duration | No | Optional delay before revoking sessions |
 | `address` | string | No | Salesforce instance URL (overrides `ADDRESS` environment variable) |
 
-### Output
+### Output Structure
 
-- `status`: Operation result (`success`, `failed`, etc.)
-- `username`: The username that was processed
-- `userId`: The Salesforce user ID
-- `sessionsRevoked`: Number of sessions that were successfully revoked
-- `processed_at`: When the operation completed (ISO 8601)
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | string | Operation result (success, failed, etc.) |
+| `username` | string | The username that was processed |
+| `userId` | string | The Salesforce user ID |
+| `sessionsRevoked` | number | Number of sessions that were successfully revoked |
+| `processed_at` | datetime | When the operation completed (ISO 8601) |
+| `address` | string | The Salesforce API base URL used |
 
 ## How It Works
 
