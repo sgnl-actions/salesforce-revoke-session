@@ -63,14 +63,16 @@ This action supports multiple authentication methods. Configure one of the follo
 | `delay` | Duration | No | Optional delay before revoking sessions |
 | `address` | string | No | Salesforce instance URL (overrides `ADDRESS` environment variable) |
 
-### Output
+### Output Structure
 
-- `status`: Operation result (`success`, `failed`, etc.)
-- `username`: The username that was processed
-- `userId`: The Salesforce user ID
-- `sessionsRevoked`: Number of sessions that were successfully revoked
-- `processed_at`: When the operation completed (ISO 8601)
-- `address`: The Salesforce API base URL used
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | string | Operation result (success, failed, etc.) |
+| `username` | string | The username that was processed |
+| `userId` | string | The Salesforce user ID |
+| `sessionsRevoked` | number | Number of sessions that were successfully revoked |
+| `processed_at` | datetime | When the operation completed (ISO 8601) |
+| `address` | string | The Salesforce API base URL used |
 
 ## How It Works
 
