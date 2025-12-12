@@ -72,11 +72,6 @@ export default {
     }
 
 
-    // Validate inputs
-    if (!resolvedParams.username) {
-      throw new Error('username is required');
-    }
-
     const { username } = resolvedParams;
 
     // Get base URL using utility function
@@ -130,7 +125,8 @@ export default {
           username,
           userId,
           sessionsRevoked: 0,
-          processed_at: new Date().toISOString()
+          processed_at: new Date().toISOString(),
+          address: baseUrl
         };
       }
 
@@ -166,7 +162,8 @@ export default {
         username,
         userId,
         sessionsRevoked,
-        processed_at: new Date().toISOString()
+        processed_at: new Date().toISOString(),
+        address: baseUrl
       };
 
     } catch (error) {

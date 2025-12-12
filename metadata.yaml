@@ -20,15 +20,13 @@ inputs:
       min: 1
       max: 20
 
-# Required secrets (configured per tenant)
-secrets:
-  SALESFORCE_ACCESS_TOKEN:
-    description: OAuth access token for Salesforce API authentication
-
-# Required environment variables
-environment:
-  SALESFORCE_INSTANCE_URL:
-    description: Salesforce instance URL (e.g., https://mycompany.salesforce.com)
+  address:
+    type: text
+    description: Optional Salesforce API base URL override
+    required: false
+    validation:
+      min: 1
+      max: 100
 
 # Expected output structure
 outputs:
@@ -51,3 +49,7 @@ outputs:
   processed_at:
     type: datetime
     description: When the operation completed (ISO 8601)
+
+  address:
+    type: text
+    description: The Salesforce API base URL used
