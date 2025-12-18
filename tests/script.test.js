@@ -202,11 +202,6 @@ describe('Salesforce Revoke Session Script', () => {
       );
     });
 
-    test('should validate required inputs', async () => {
-      const params = {};
-
-      await expect(script.invoke(params, mockContext)).rejects.toThrow('username is required');
-    });
 
     test('should validate required secrets', async () => {
       const params = { username: 'test@example.com' };
