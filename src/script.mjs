@@ -8,26 +8,22 @@
  * 3. Delete each session individually
  */
 
-import { getBaseURL, getAuthorizationHeader} from '@sgnl-actions/utils';
+import { getBaseURL, createAuthHeaders} from '@sgnl-actions/utils';
 
 /**
  * Helper function to make Salesforce API calls
  * @param {string} endpoint - API endpoint path
  * @param {string} method - HTTP method
  * @param {string} baseUrl - Salesforce instance URL
- * @param {string} authHeader - Authorization header (already formatted)
+ * @param {Object} headers - Headers object (already formatted)
  * @returns {Response} Fetch response
  */
-async function callSalesforceAPI(endpoint, method, baseUrl, authHeader) {
+async function callSalesforceAPI(endpoint, method, baseUrl, headers) {
   const url = `${baseUrl}${endpoint}`;
 
   const response = await fetch(url, {
     method,
-    headers: {
-      'Authorization': authHeader,
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
-    }
+    headers
   });
 
   return response;
@@ -68,8 +64,8 @@ export default {
     // Get base URL using utility function
     const baseUrl = getBaseURL(params, context);
 
-    // Get authorization header using utility function
-    const authHeader = await getAuthorizationHeader(context);
+    // Get authorization headers using utility function
+    const headers = await createAuthHeaders(context);
 
     console.log(`Processing username: ${username}`);
 
@@ -79,7 +75,7 @@ export default {
       const userQueryEndpoint = `/services/data/v61.0/query?q=SELECT+Id+FROM+User+WHERE+username+LIKE+'${encodedUsername}'+ORDER+BY+Id+ASC`;
 
       console.log('Step 1: Querying for user ID...');
-      const userResponse = await callSalesforceAPI(userQueryEndpoint, 'GET', baseUrl, authHeader);
+      const userResponse = await callSalesforceAPI(userQueryEndpoint, 'GET', baseUrl, headers);
 
       if (!userResponse.ok) {
         throw new Error(`Failed to query user: ${userResponse.status} ${userResponse.statusText}`);
@@ -98,7 +94,7 @@ export default {
       const sessionQueryEndpoint = `/services/data/v61.0/query?q=SELECT+Id,UsersId+FROM+AuthSession+WHERE+UsersId='${userId}'+AND+IsCurrent=false+ORDER+BY+Id+ASC`;
 
       console.log('Step 2: Querying for user sessions...');
-      const sessionResponse = await callSalesforceAPI(sessionQueryEndpoint, 'GET', baseUrl, authHeader);
+      const sessionResponse = await callSalesforceAPI(sessionQueryEndpoint, 'GET', baseUrl, headers);
 
       if (!sessionResponse.ok) {
         throw new Error(`Failed to query sessions: ${sessionResponse.status} ${sessionResponse.statusText}`);
@@ -129,7 +125,7 @@ export default {
         const deleteEndpoint = `/services/data/v61.0/sobjects/AuthSession/${session.Id}`;
 
         try {
-          const deleteResponse = await callSalesforceAPI(deleteEndpoint, 'DELETE', baseUrl, authHeader);
+          const deleteResponse = await callSalesforceAPI(deleteEndpoint, 'DELETE', baseUrl, headers);
 
           // Handle 204 No Content as success, and 404 as success (cascade deletes)
           if (deleteResponse.status === 204 || deleteResponse.status === 404) {

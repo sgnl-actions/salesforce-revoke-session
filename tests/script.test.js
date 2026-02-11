@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import script from '../src/script.mjs';
+import { SGNL_USER_AGENT } from '@sgnl-actions/utils'; 
 
 // Mock fetch globally
 global.fetch = jest.fn();
@@ -73,7 +74,8 @@ describe('Salesforce Revoke Session Script', () => {
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-access-token-123456'
+            'Authorization': 'Bearer test-access-token-123456',
+            'User-Agent': SGNL_USER_AGENT
           })
         })
       );
@@ -84,7 +86,8 @@ describe('Salesforce Revoke Session Script', () => {
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-access-token-123456'
+            'Authorization': 'Bearer test-access-token-123456',
+            'User-Agent': SGNL_USER_AGENT 
           })
         })
       );
@@ -95,7 +98,8 @@ describe('Salesforce Revoke Session Script', () => {
         expect.objectContaining({
           method: 'DELETE',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-access-token-123456'
+            'Authorization': 'Bearer test-access-token-123456',
+            'User-Agent': SGNL_USER_AGENT
           })
         })
       );

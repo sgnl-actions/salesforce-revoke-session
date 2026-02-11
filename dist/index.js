@@ -9,6 +9,11 @@
  */
 
 /**
+ * User-Agent header value for all SGNL CAEP Hub requests.
+ */
+const SGNL_USER_AGENT = 'SGNL-CAEP-Hub/2.0';
+
+/**
  * Get OAuth2 access token using client credentials flow
  * @param {Object} config - OAuth2 configuration
  * @param {string} config.tokenUrl - Token endpoint URL
@@ -39,7 +44,8 @@ async function getClientCredentialsToken(config) {
 
   const headers = {
     'Content-Type': 'application/x-www-form-urlencoded',
-    'Accept': 'application/json'
+    'Accept': 'application/json',
+    'User-Agent': SGNL_USER_AGENT
   };
 
   if (authStyle === 'InParams') {
@@ -158,6 +164,21 @@ function getBaseURL(params, context) {
 }
 
 /**
+ * Create full headers object with Authorization and common headers
+ * @param {Object} context - Execution context with env and secrets
+ * @returns {Promise<Object>} Headers object with Authorization, Accept, Content-Type
+ */
+async function createAuthHeaders(context) {
+  const authHeader = await getAuthorizationHeader(context);
+  return {
+    'Authorization': authHeader,
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    'User-Agent': SGNL_USER_AGENT
+  };
+}
+
+/**
  * Salesforce Revoke Session Action
  *
  * This action revokes all active sessions for a specific user in Salesforce
@@ -173,19 +194,15 @@ function getBaseURL(params, context) {
  * @param {string} endpoint - API endpoint path
  * @param {string} method - HTTP method
  * @param {string} baseUrl - Salesforce instance URL
- * @param {string} authHeader - Authorization header (already formatted)
+ * @param {Object} headers - Headers object (already formatted)
  * @returns {Response} Fetch response
  */
-async function callSalesforceAPI(endpoint, method, baseUrl, authHeader) {
+async function callSalesforceAPI(endpoint, method, baseUrl, headers) {
   const url = `${baseUrl}${endpoint}`;
 
   const response = await fetch(url, {
     method,
-    headers: {
-      'Authorization': authHeader,
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
-    }
+    headers
   });
 
   return response;
@@ -226,8 +243,8 @@ var script = {
     // Get base URL using utility function
     const baseUrl = getBaseURL(params, context);
 
-    // Get authorization header using utility function
-    const authHeader = await getAuthorizationHeader(context);
+    // Get authorization headers using utility function
+    const headers = await createAuthHeaders(context);
 
     console.log(`Processing username: ${username}`);
 
@@ -237,7 +254,7 @@ var script = {
       const userQueryEndpoint = `/services/data/v61.0/query?q=SELECT+Id+FROM+User+WHERE+username+LIKE+'${encodedUsername}'+ORDER+BY+Id+ASC`;
 
       console.log('Step 1: Querying for user ID...');
-      const userResponse = await callSalesforceAPI(userQueryEndpoint, 'GET', baseUrl, authHeader);
+      const userResponse = await callSalesforceAPI(userQueryEndpoint, 'GET', baseUrl, headers);
 
       if (!userResponse.ok) {
         throw new Error(`Failed to query user: ${userResponse.status} ${userResponse.statusText}`);
@@ -256,7 +273,7 @@ var script = {
       const sessionQueryEndpoint = `/services/data/v61.0/query?q=SELECT+Id,UsersId+FROM+AuthSession+WHERE+UsersId='${userId}'+AND+IsCurrent=false+ORDER+BY+Id+ASC`;
 
       console.log('Step 2: Querying for user sessions...');
-      const sessionResponse = await callSalesforceAPI(sessionQueryEndpoint, 'GET', baseUrl, authHeader);
+      const sessionResponse = await callSalesforceAPI(sessionQueryEndpoint, 'GET', baseUrl, headers);
 
       if (!sessionResponse.ok) {
         throw new Error(`Failed to query sessions: ${sessionResponse.status} ${sessionResponse.statusText}`);
@@ -287,7 +304,7 @@ var script = {
         const deleteEndpoint = `/services/data/v61.0/sobjects/AuthSession/${session.Id}`;
 
         try {
-          const deleteResponse = await callSalesforceAPI(deleteEndpoint, 'DELETE', baseUrl, authHeader);
+          const deleteResponse = await callSalesforceAPI(deleteEndpoint, 'DELETE', baseUrl, headers);
 
           // Handle 204 No Content as success, and 404 as success (cascade deletes)
           if (deleteResponse.status === 204 || deleteResponse.status === 404) {
