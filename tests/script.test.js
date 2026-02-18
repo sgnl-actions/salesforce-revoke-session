@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import script from '../src/script.mjs';
-import { SGNL_USER_AGENT } from '@sgnl-actions/utils'; 
+import { SGNL_USER_AGENT } from '@sgnl-actions/utils';
 
 // Mock fetch globally
 global.fetch = jest.fn();
@@ -87,7 +87,7 @@ describe('Salesforce Revoke Session Script', () => {
           method: 'GET',
           headers: expect.objectContaining({
             'Authorization': 'Bearer test-access-token-123456',
-            'User-Agent': SGNL_USER_AGENT 
+            'User-Agent': SGNL_USER_AGENT
           })
         })
       );
