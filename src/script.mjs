@@ -8,7 +8,7 @@
  * 3. Delete each session individually
  */
 
-import { getBaseURL, createAuthHeaders} from '@sgnl-actions/utils';
+import { getBaseURL, createAuthHeaders } from '@sgnl-actions/utils';
 
 /**
  * Helper function to make Salesforce API calls
