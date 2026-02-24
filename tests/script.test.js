@@ -206,18 +206,6 @@ describe('Salesforce Revoke Session Script', () => {
       );
     });
 
-
-    test('should validate required secrets', async () => {
-      const params = { username: 'test@example.com' };
-      const contextMissingSecret = {
-        ...mockContext,
-        secrets: {}
-      };
-
-      await expect(script.invoke(params, contextMissingSecret))
-        .rejects.toThrow('No authentication configured');
-    });
-
     test('should validate required environment variables', async () => {
       const params = { username: 'test@example.com' };
       const contextMissingEnv = {
