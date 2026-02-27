@@ -8,7 +8,7 @@
  * 3. Delete each session individually
  */
 
-import { getBaseURL, createAuthHeaders } from '@sgnl-actions/utils';
+import { getBaseURL, createHeaders } from '@sgnl-actions/utils';
 
 /**
  * Helper function to make Salesforce API calls
@@ -65,7 +65,7 @@ export default {
     const baseUrl = getBaseURL(params, context);
 
     // Get authorization headers using utility function
-    const headers = await createAuthHeaders(context);
+    const headers = await createHeaders(context);
 
     console.log(`Processing username: ${username}`);
 
