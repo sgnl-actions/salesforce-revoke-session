@@ -25,7 +25,7 @@
   "author": "SGNL Engineering",
   "license": "MIT",
   "dependencies": {
-    "@sgnl-actions/utils": "github:sgnl-actions/utils#v1.0.8"
+    "@sgnl-actions/utils": "github:sgnl-actions/utils#v1.0.9"
   },
   "devDependencies": {
     "@sgnl-actions/eslint-config": "github:sgnl-actions/eslint-config#2b56a0c67e638f21688d73dbfb228a2f2d868235",
@@ -37,6 +37,9 @@
     "rollup": "^4.60.4"
   },
   "overrides": {
-    "serialize-javascript": ">=7.0.5"
+    "serialize-javascript": ">=7.0.5",
+    "generate-license-file": {
+      "minipass-fetch": "5.0.2"
+    }
   }
 }
